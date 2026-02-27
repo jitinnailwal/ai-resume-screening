@@ -63,11 +63,16 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 app.use(async (req, res, next) => {
+  if (req.method === "OPTIONS") return next();
+  if (req.path === "/" || req.path === "/api/health") return next();
+  if (!req.path.startsWith("/api")) return next();
+
   try {
     await ensureInitialized();
     next();
   } catch (error) {
-    next(error);
+    console.error("Initialization error:", error.message);
+    res.status(500).json({ message: "Server initialization failed", error: error.message });
   }
 });
 
@@ -85,6 +90,11 @@ app.use("/api/employer", employerRoutes);
 // Health check
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
+// Root check for Vercel uptime probing
+app.get("/", (req, res) => {
+  res.json({ status: "ok", service: "ai-resume-server" });
 });
 
 // Debug: test PDF parsing directly (no auth needed)

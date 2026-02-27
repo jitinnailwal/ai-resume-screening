@@ -14,7 +14,9 @@ const connectDB = async () => {
 
   if (!cachedPromise) {
     cachedPromise = mongoose
-      .connect(process.env.MONGO_URI)
+      .connect(process.env.MONGO_URI, {
+        serverSelectionTimeoutMS: 5000,
+      })
       .then((conn) => {
         console.log(`MongoDB Connected: ${conn.connection.host}`);
         cachedConnection = conn;
