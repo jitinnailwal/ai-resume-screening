@@ -53,14 +53,7 @@ app.use("/api/employer", employerRoutes);
 
 // Health check
 app.get("/api/health", (req, res) => {
-  const mongoose = require("mongoose");
-  res.json({
-    status: "ok",
-    timestamp: new Date().toISOString(),
-    dbState: mongoose.connection.readyState,
-    hasMongoUri: !!process.env.MONGO_URI,
-    mongoUriPrefix: process.env.MONGO_URI ? process.env.MONGO_URI.substring(0, 30) : "NOT SET",
-  });
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
 // 404 handler
