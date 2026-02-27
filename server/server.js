@@ -29,6 +29,7 @@ connectDB().then(async () => {
 app.use(cors({
   origin: [
     "http://localhost:3000",
+    "https://client-ai-resume-vercel.app",
     process.env.CLIENT_URL,
   ].filter(Boolean),
   credentials: true,
