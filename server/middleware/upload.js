@@ -1,23 +1,10 @@
 const multer = require("multer");
 const path = require("path");
-const fs = require("fs");
-
-const ensureDir = (dirPath) => {
-  if (!fs.existsSync(dirPath)) {
-    fs.mkdirSync(dirPath, { recursive: true });
-  }
-};
-
-const avatarsDir = path.join(__dirname, "../uploads/avatars");
-const resumesDir = path.join(__dirname, "../uploads/resumes");
-
-ensureDir(avatarsDir);
-ensureDir(resumesDir);
 
 // Avatar upload config
 const avatarStorage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, avatarsDir);
+    cb(null, path.join(__dirname, "../uploads/avatars"));
   },
   filename: function (req, file, cb) {
     const uniqueName = `avatar-${req.user._id}-${Date.now()}${path.extname(file.originalname)}`;
@@ -45,7 +32,7 @@ const uploadAvatar = multer({
 // Resume upload config
 const resumeStorage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, resumesDir);
+    cb(null, path.join(__dirname, "../uploads/resumes"));
   },
   filename: function (req, file, cb) {
     const uniqueName = `resume-${req.user._id}-${Date.now()}${path.extname(file.originalname)}`;
