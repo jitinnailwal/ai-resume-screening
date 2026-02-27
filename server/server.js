@@ -16,22 +16,7 @@ const employerRoutes = require("./routes/employer");
 
 const app = express();
 
-// Connect to MongoDB and migrate existing jobs
-connectDB().then(async () => {
-  try {
-    const Job = require("./models/Job");
-    const result = await Job.updateMany({ mode: { $exists: false } }, { $set: { mode: "remote" } });
-    if (result.modifiedCount > 0) {
-      console.log(`Migrated ${result.modifiedCount} existing jobs with mode: "remote"`);
-    }
-  } catch (err) {
-    console.error("Migration error:", err.message);
-  }
-}).catch((err) => {
-  console.error("DB connection failed:", err.message);
-});
-
-// Middleware
+// Middleware (CORS must be first for preflight requests)
 app.use(cors({
   origin: [
     "http://localhost:3000",
@@ -43,6 +28,17 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+
+// Ensure DB is connected before handling any API request
+app.use("/api", async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    console.error("DB middleware error:", err.message);
+    res.status(503).json({ message: "Database connection failed" });
+  }
+});
 
 // Serve uploaded files statically
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
@@ -58,27 +54,6 @@ app.use("/api/employer", employerRoutes);
 // Health check
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
-});
-
-// Debug: test PDF parsing directly (no auth needed)
-app.get("/api/debug/test-parse", async (req, res) => {
-  const fs = require("fs");
-  const resumeDir = path.join(__dirname, "uploads", "resumes");
-  try {
-    const files = fs.readdirSync(resumeDir).filter((f) => f.endsWith(".pdf"));
-    if (files.length === 0) return res.json({ error: "No PDF files found in uploads/resumes" });
-
-    const testFile = path.resolve(path.join(resumeDir, files[0]));
-    const { parsePDF, extractSkills, calculateScore } = require("./utils/resumeParser");
-    const text = await parsePDF(testFile);
-    if (!text) return res.json({ error: "parsePDF returned null", file: testFile, exists: fs.existsSync(testFile) });
-
-    const skills = extractSkills(text);
-    const score = calculateScore(text, skills);
-    res.json({ file: files[0], textLength: text.length, textPreview: text.substring(0, 300), skills, score });
-  } catch (err) {
-    res.json({ error: err.message, stack: err.stack });
-  }
 });
 
 // 404 handler
