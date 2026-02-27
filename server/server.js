@@ -5,6 +5,7 @@ const path = require("path");
 require("dotenv").config();
 
 const connectDB = require("./config/db");
+const { uploadsBaseDir, resumesDir } = require("./config/paths");
 
 // Route imports
 const authRoutes = require("./routes/auth");
@@ -71,7 +72,7 @@ app.use(async (req, res, next) => {
 });
 
 // Serve uploaded files statically
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/uploads", express.static(uploadsBaseDir));
 
 // API Routes
 app.use("/api/auth", authRoutes);
@@ -89,7 +90,7 @@ app.get("/api/health", (req, res) => {
 // Debug: test PDF parsing directly (no auth needed)
 app.get("/api/debug/test-parse", async (req, res) => {
   const fs = require("fs");
-  const resumeDir = path.join(__dirname, "uploads", "resumes");
+  const resumeDir = resumesDir;
   try {
     const files = fs.readdirSync(resumeDir).filter((f) => f.endsWith(".pdf"));
     if (files.length === 0) return res.json({ error: "No PDF files found in uploads/resumes" });

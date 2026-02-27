@@ -2,11 +2,12 @@ const Resume = require("../models/Resume");
 const Job = require("../models/Job");
 const fs = require("fs");
 const path = require("path");
+const { resumesDir } = require("../config/paths");
 const { parsePDF, extractSkills, calculateATSScore, matchResumeToJob } = require("../utils/resumeParser");
 
 // Helper: get absolute path to a resume file
 function getResumePath(filename) {
-  return path.resolve(path.join(__dirname, "..", "uploads", "resumes", filename));
+  return path.resolve(path.join(resumesDir, filename));
 }
 
 // Helper: analyze a resume file and return full ATS analysis
