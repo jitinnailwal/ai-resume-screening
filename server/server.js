@@ -18,11 +18,17 @@ const app = express();
 
 // Connect to MongoDB and migrate existing jobs
 connectDB().then(async () => {
-  const Job = require("./models/Job");
-  const result = await Job.updateMany({ mode: { $exists: false } }, { $set: { mode: "remote" } });
-  if (result.modifiedCount > 0) {
-    console.log(`Migrated ${result.modifiedCount} existing jobs with mode: "remote"`);
+  try {
+    const Job = require("./models/Job");
+    const result = await Job.updateMany({ mode: { $exists: false } }, { $set: { mode: "remote" } });
+    if (result.modifiedCount > 0) {
+      console.log(`Migrated ${result.modifiedCount} existing jobs with mode: "remote"`);
+    }
+  } catch (err) {
+    console.error("Migration error:", err.message);
   }
+}).catch((err) => {
+  console.error("DB connection failed:", err.message);
 });
 
 // Middleware
@@ -94,11 +100,13 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: "Internal server error" });
 });
 
-const PORT = process.env.PORT || 5000;
-
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Health check: http://localhost:${PORT}/api/health`);
-});
+// Only listen when running locally (not on Vercel serverless)
+if (!process.env.VERCEL) {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+    console.log(`Health check: http://localhost:${PORT}/api/health`);
+  });
+}
 
 module.exports = app;
