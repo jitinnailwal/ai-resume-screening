@@ -1,7 +1,6 @@
 const User = require("../models/User");
 const fs = require("fs");
 const path = require("path");
-const { avatarsDir } = require("../config/paths");
 
 // @desc    Update user name (allowed only twice)
 // @route   PUT /api/user/name
@@ -76,7 +75,7 @@ exports.uploadAvatar = async (req, res) => {
 
     // Delete old avatar if it's not the default
     if (user.avatar && user.avatar !== "default-avatar.png") {
-      const oldPath = path.join(avatarsDir, user.avatar);
+      const oldPath = path.join(__dirname, "../uploads/avatars", user.avatar);
       if (fs.existsSync(oldPath)) {
         fs.unlinkSync(oldPath);
       }

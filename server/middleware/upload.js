@@ -1,13 +1,15 @@
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
-const { avatarsDir, resumesDir } = require("../config/paths");
 
 const ensureDir = (dirPath) => {
   if (!fs.existsSync(dirPath)) {
     fs.mkdirSync(dirPath, { recursive: true });
   }
 };
+
+const avatarsDir = path.join(__dirname, "../uploads/avatars");
+const resumesDir = path.join(__dirname, "../uploads/resumes");
 
 ensureDir(avatarsDir);
 ensureDir(resumesDir);
