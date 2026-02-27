@@ -1,0 +1,12 @@
+node_modules
+dist
+.env
+*.log
+npm-debug.log*
+.DS_Store
+.vscode
+.idea
+*.local
+server/uploads/resumes/*
+!server/uploads/resumes/.gitkeep
+.claude/
