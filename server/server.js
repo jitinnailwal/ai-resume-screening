@@ -16,27 +16,59 @@ const employerRoutes = require("./routes/employer");
 
 const app = express();
 
-// Connect to MongoDB and migrate existing jobs
-connectDB().then(async () => {
-  const Job = require("./models/Job");
-  const result = await Job.updateMany({ mode: { $exists: false } }, { $set: { mode: "remote" } });
-  if (result.modifiedCount > 0) {
-    console.log(`Migrated ${result.modifiedCount} existing jobs with mode: "remote"`);
+let initPromise = null;
+
+const ensureInitialized = async () => {
+  if (!initPromise) {
+    initPromise = (async () => {
+      await connectDB();
+
+      const Job = require("./models/Job");
+      const result = await Job.updateMany(
+        { mode: { $exists: false } },
+        { $set: { mode: "remote" } }
+      );
+
+      if (result.modifiedCount > 0) {
+        console.log(`Migrated ${result.modifiedCount} existing jobs with mode: "remote"`);
+      }
+    })().catch((error) => {
+      initPromise = null;
+      throw error;
+    });
   }
-});
+
+  return initPromise;
+};
 
 // Middleware
-app.use(cors({
-  origin: [
-    "http://localhost:3000",
-    "https://client-ai-resume-vercel.app",
-    process.env.CLIENT_URL,
-  ].filter(Boolean),
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (origin === "http://localhost:3000") return callback(null, true);
+    if (process.env.CLIENT_URL && origin === process.env.CLIENT_URL) return callback(null, true);
+    if (/^https:\/\/.*\.vercel\.app$/.test(origin)) return callback(null, true);
+    return callback(null, false);
+  },
   credentials: true,
-}));
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
+
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+
+app.use(async (req, res, next) => {
+  try {
+    await ensureInitialized();
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
 
 // Serve uploaded files statically
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
@@ -94,11 +126,12 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: "Internal server error" });
 });
 
-const PORT = process.env.PORT || 5000;
-
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Health check: http://localhost:${PORT}/api/health`);
-});
+if (process.env.VERCEL !== "1") {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+    console.log(`Health check: http://localhost:${PORT}/api/health`);
+  });
+}
 
 module.exports = app;
