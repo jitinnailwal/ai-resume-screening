@@ -297,9 +297,9 @@ export default function Profile() {
           </div>
 
           {/* Logout */}
-          <div className="card profile-section profile-logout-section">
-            <button className="btn btn-danger logout-btn" onClick={handleLogout}>
-              <FiLogOut size={18} /> Logout
+          <div className="profile-logout-section">
+            <button className="btn btn-danger btn-sm logout-btn" onClick={handleLogout}>
+              <FiLogOut size={14} /> Logout
             </button>
           </div>
         </div>
