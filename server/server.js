@@ -5,6 +5,7 @@ const path = require("path");
 require("dotenv").config();
 
 const connectDB = require("./config/db");
+const { autoSeed } = require("./utils/autoSeed");
 
 // Route imports
 const authRoutes = require("./routes/auth");
@@ -36,6 +37,7 @@ app.use(cookieParser());
 app.use("/api", async (req, res, next) => {
   try {
     await connectDB();
+    await autoSeed();
     next();
   } catch (err) {
     console.error("DB middleware error:", err.message);
