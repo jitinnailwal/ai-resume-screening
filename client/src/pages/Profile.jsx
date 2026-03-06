@@ -1,13 +1,15 @@
 import { useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { updateName, changePassword, uploadAvatar, updateProfile } from '../services/api';
 import toast from 'react-hot-toast';
-import { FiUser, FiCamera } from 'react-icons/fi';
+import { FiUser, FiCamera, FiLogOut } from 'react-icons/fi';
 import { HiMail, HiLockClosed, HiPencil, HiCheck, HiX, HiSun, HiMoon } from 'react-icons/hi';
 
 export default function Profile() {
-  const { user, updateUser } = useAuth();
+  const { user, updateUser, logout } = useAuth();
+  const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
   const fileRef = useRef(null);
 
@@ -98,6 +100,11 @@ export default function Profile() {
     } finally {
       setSavingProfile(false);
     }
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
   };
 
   const nameChangesLeft = user?.nameChangesLeft ?? 2;
@@ -276,7 +283,6 @@ export default function Profile() {
                 </div>
               </div>
             ) : (
-              //claude --resume daba6625-7373-4f3f-ade2-40abdcd5df9d   
               <div className="bio-display">
                 <p>{user?.bio || 'No bio added yet.'}</p>
                 {user?.skills?.length > 0 && (
@@ -288,6 +294,13 @@ export default function Profile() {
                 )}
               </div>
             )}
+          </div>
+
+          {/* Logout */}
+          <div className="card profile-section profile-logout-section">
+            <button className="btn btn-danger logout-btn" onClick={handleLogout}>
+              <FiLogOut size={18} /> Logout
+            </button>
           </div>
         </div>
       </div>

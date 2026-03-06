@@ -366,6 +366,8 @@ img { max-width: 100%; }
 .bio-edit textarea, .bio-edit input { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-input); color: var(--text); font-size: 0.9rem; font-family: inherit; outline: none; resize: vertical; }
 .bio-edit textarea:focus, .bio-edit input:focus { border-color: var(--accent); }
 .bio-display p { font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 8px; }
+.profile-logout-section { text-align: center; padding: 20px; }
+.logout-btn { display: inline-flex; align-items: center; gap: 8px; width: 100%; justify-content: center; padding: 12px 24px; font-size: 0.95rem; font-weight: 600; }
 
 /* ============================
    EMPLOYER PAGES
