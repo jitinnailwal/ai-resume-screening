@@ -5,12 +5,20 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 // Initialize Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Initialize pdf-parse as fallback
-let PDFParseFallback;
+// pdf-parse v1 (works on serverless/Vercel)
+let pdfParseV1;
 try {
-  PDFParseFallback = require("pdf-parse").PDFParse;
+  pdfParseV1 = require("pdf-parse-v1");
 } catch (e) {
-  console.log("[resumeParser] pdf-parse fallback not available");
+  console.log("[resumeParser] pdf-parse-v1 not available");
+}
+
+// pdf-parse v2 (better quality, needs native bindings)
+let PDFParseV2;
+try {
+  PDFParseV2 = require("pdf-parse").PDFParse;
+} catch (e) {
+  console.log("[resumeParser] pdf-parse v2 not available");
 }
 
 // SKILLS DATABASE
@@ -189,13 +197,30 @@ const SHORT_TERMS = new Set(["r", "go", "js", "ts", "py", "rb", "kt", "sh", "dl"
  * Parse PDF file using Gemini API
  */
 /**
- * Parse PDF using pdf-parse library from buffer (local, no API needed)
+ * Parse PDF using pdf-parse v1 (works everywhere including serverless)
  */
-async function parsePDFLocal(buffer) {
-  if (!PDFParseFallback) return null;
+async function parsePDFv1(buffer) {
+  if (!pdfParseV1) return null;
+  try {
+    const data = await pdfParseV1(buffer);
+    if (data && data.text && data.text.trim().length > 0) {
+      return data.text;
+    }
+    return null;
+  } catch (e) {
+    console.error("[parsePDFv1] Error:", e.message);
+    return null;
+  }
+}
+
+/**
+ * Parse PDF using pdf-parse v2 (better quality, needs native bindings)
+ */
+async function parsePDFv2(buffer) {
+  if (!PDFParseV2) return null;
   try {
     const uint8Array = new Uint8Array(buffer);
-    const parser = new PDFParseFallback({ data: uint8Array });
+    const parser = new PDFParseV2({ data: uint8Array });
     await parser.load();
     const result = await parser.getText();
 
@@ -210,7 +235,7 @@ async function parsePDFLocal(buffer) {
     if (text && text.trim().length > 0) return text;
     return null;
   } catch (e) {
-    console.error("[parsePDFLocal] Error:", e.message);
+    console.error("[parsePDFv2] Error:", e.message);
     return null;
   }
 }
@@ -268,7 +293,7 @@ async function parsePDF(input) {
     return null;
   }
 
-  // Try Gemini first
+  // Try Gemini first (best quality)
   console.log("[parsePDF] Trying Gemini API...");
   const geminiText = await parsePDFGemini(buffer);
   if (geminiText) {
@@ -276,12 +301,20 @@ async function parsePDF(input) {
     return geminiText;
   }
 
-  // Fallback to pdf-parse
-  console.log("[parsePDF] Gemini failed, trying pdf-parse...");
-  const localText = await parsePDFLocal(buffer);
-  if (localText) {
-    console.log("[parsePDF] pdf-parse extracted text length:", localText.length);
-    return localText;
+  // Fallback to pdf-parse v1 (works on serverless)
+  console.log("[parsePDF] Gemini failed, trying pdf-parse v1...");
+  const v1Text = await parsePDFv1(buffer);
+  if (v1Text) {
+    console.log("[parsePDF] pdf-parse v1 extracted text length:", v1Text.length);
+    return v1Text;
+  }
+
+  // Fallback to pdf-parse v2 (needs native bindings)
+  console.log("[parsePDF] v1 failed, trying pdf-parse v2...");
+  const v2Text = await parsePDFv2(buffer);
+  if (v2Text) {
+    console.log("[parsePDF] pdf-parse v2 extracted text length:", v2Text.length);
+    return v2Text;
   }
 
   console.error("[parsePDF] All parsing methods failed");
