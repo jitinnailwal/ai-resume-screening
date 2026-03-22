@@ -246,7 +246,7 @@ async function parsePDFv2(buffer) {
  */
 async function parsePDFGemini(buffer, retries = 2) {
   const base64Data = Buffer.from(buffer).toString("base64");
-  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
