@@ -1,9 +1,16 @@
 const fs = require("fs");
 const path = require("path");
 
-// ============================================
-// SKILLS DATABASE — ~150 skills with aliases
-// ============================================
+// Pre-load pdf-parse at module level
+let PDFParse;
+try {
+  PDFParse = require("pdf-parse").PDFParse;
+} catch (e) {
+  console.error("[resumeParser] Failed to load pdf-parse:", e.message);
+}
+
+// SKILLS DATABASE
+
 const SKILLS_DATABASE = {
   "Programming Languages": {
     javascript: ["js", "es6", "es2015", "ecmascript"],
@@ -185,8 +192,12 @@ async function parsePDF(filePath) {
     return null;
   }
 
+  if (!PDFParse) {
+    console.error("[parsePDF] pdf-parse not available");
+    return null;
+  }
+
   try {
-    const { PDFParse } = require("pdf-parse");
     const fileBuffer = fs.readFileSync(filePath);
     const uint8Array = new Uint8Array(fileBuffer);
     console.log("[parsePDF] File read, buffer size:", uint8Array.length);
@@ -196,7 +207,10 @@ async function parsePDF(filePath) {
     const result = await parser.getText();
 
     let text = "";
-    if (result && result.pages && result.pages.length > 0) {
+    if (result && result.text) {
+      // pdf-parse v2 provides result.text directly
+      text = result.text;
+    } else if (result && result.pages && result.pages.length > 0) {
       text = result.pages.map((p) => p.text || "").join("\n");
     }
 

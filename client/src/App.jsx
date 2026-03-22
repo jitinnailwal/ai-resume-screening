@@ -25,10 +25,11 @@ export default function App() {
             <Route element={<Layout />}>
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
-              {/* Employee routes */}
-              <Route path="/" element={<PrivateRoute><Home /></PrivateRoute>} />
+              {/* Public employee routes (guests can browse) */}
+              <Route path="/" element={<Home />} />
+              <Route path="/jobs" element={<Jobs />} />
+              {/* Protected employee routes */}
               <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
-              <Route path="/jobs" element={<PrivateRoute><Jobs /></PrivateRoute>} />
               <Route path="/resumes" element={<PrivateRoute><Resumes /></PrivateRoute>} />
               <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
               {/* Employer routes */}

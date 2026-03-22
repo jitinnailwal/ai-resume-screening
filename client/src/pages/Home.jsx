@@ -1,4 +1,6 @@
 import { useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { uploadResume, getRecommendations, reanalyzeResume } from '../services/api';
 import toast from 'react-hot-toast';
 import { HiUpload, HiDocumentText, HiStar, HiBriefcase, HiCheckCircle } from 'react-icons/hi';
@@ -112,6 +114,8 @@ function CategorizedSkills({ categorizedSkills, flatSkills }) {
 }
 
 export default function Home() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [file, setFile] = useState(null);
   const [dragActive, setDragActive] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -141,6 +145,11 @@ export default function Home() {
   };
 
   const handleUpload = async () => {
+    if (!user) {
+      toast('Please login to upload your resume');
+      navigate('/login?redirect=/');
+      return;
+    }
     if (!file) return toast.error('Please select a file');
     const formData = new FormData();
     formData.append('resume', file);

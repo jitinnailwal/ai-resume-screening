@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import { HiMail, HiLockClosed, HiEye, HiEyeOff, HiUser, HiOfficeBuilding } from 'react-icons/hi';
@@ -12,6 +12,8 @@ export default function Login() {
   const [roleTab, setRoleTab] = useState('employee');
   const { login } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirectTo = searchParams.get('redirect');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -19,9 +21,13 @@ export default function Login() {
     try {
       const data = await login(email, password);
       toast.success('Welcome back!');
-      // Navigate based on actual user role from backend
+      // Navigate to redirect URL or default based on role
       const userRole = data.user?.role || 'employee';
-      navigate(userRole === 'employer' ? '/employer/dashboard' : '/');
+      if (redirectTo) {
+        navigate(redirectTo);
+      } else {
+        navigate(userRole === 'employer' ? '/employer/dashboard' : '/');
+      }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Login failed');
     } finally {
@@ -88,7 +94,7 @@ export default function Login() {
         </form>
 
         <p className="auth-footer">
-          Don't have an account? <Link to="/register">Create one</Link>
+          Don't have an account? <Link to={`/register${redirectTo ? `?redirect=${encodeURIComponent(redirectTo)}` : ''}`}>Create one</Link>
         </p>
       </div>
     </div>

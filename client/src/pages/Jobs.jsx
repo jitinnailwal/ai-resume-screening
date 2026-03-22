@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { getJobs, applyJob } from '../services/api';
 import toast from 'react-hot-toast';
 import { HiSearch, HiFilter, HiBriefcase, HiLocationMarker, HiCurrencyRupee, HiX, HiChevronLeft, HiChevronRight } from 'react-icons/hi';
@@ -12,6 +14,8 @@ const formatINR = (salary) => {
 };
 
 export default function Jobs() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -50,6 +54,11 @@ export default function Jobs() {
   };
 
   const handleApply = async (jobId) => {
+    if (!user) {
+      toast('Please login to apply for jobs');
+      navigate('/login?redirect=/jobs');
+      return;
+    }
     setApplying(jobId);
     try {
       await applyJob(jobId);

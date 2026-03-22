@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import { HiUser, HiMail, HiLockClosed, HiEye, HiEyeOff, HiOfficeBuilding } from 'react-icons/hi';
@@ -15,6 +15,8 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirectTo = searchParams.get('redirect');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -31,7 +33,11 @@ export default function Register() {
     try {
       await register(name, email, password, role, company);
       toast.success('Account created!');
-      navigate(role === 'employer' ? '/employer/dashboard' : '/');
+      if (redirectTo) {
+        navigate(redirectTo);
+      } else {
+        navigate(role === 'employer' ? '/employer/dashboard' : '/');
+      }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Registration failed');
     } finally {
@@ -133,7 +139,7 @@ export default function Register() {
         </form>
 
         <p className="auth-footer">
-          Already have an account? <Link to="/login">Sign in</Link>
+          Already have an account? <Link to={`/login${redirectTo ? `?redirect=${encodeURIComponent(redirectTo)}` : ''}`}>Sign in</Link>
         </p>
       </div>
     </div>
