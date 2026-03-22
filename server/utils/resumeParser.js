@@ -242,32 +242,42 @@ async function parsePDFv2(buffer) {
 
 /**
  * Parse PDF using Gemini API from buffer (better extraction quality)
+ * Includes retry with delay for 429 rate limit errors
  */
-async function parsePDFGemini(buffer) {
-  try {
-    const base64Data = Buffer.from(buffer).toString("base64");
+async function parsePDFGemini(buffer, retries = 2) {
+  const base64Data = Buffer.from(buffer).toString("base64");
+  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      if (attempt > 0) {
+        const delay = attempt * 10000; // 10s, 20s
+        console.log(`[parsePDFGemini] Retry ${attempt}, waiting ${delay / 1000}s...`);
+        await new Promise((r) => setTimeout(r, delay));
+      }
 
-    const result = await model.generateContent([
-      {
-        inlineData: {
-          mimeType: "application/pdf",
-          data: base64Data,
+      const result = await model.generateContent([
+        {
+          inlineData: {
+            mimeType: "application/pdf",
+            data: base64Data,
+          },
         },
-      },
-      {
-        text: "Extract ALL text content from this resume PDF exactly as it appears. Include every section, every detail - name, contact info, education, experience, skills, projects, certifications, everything. Return ONLY the extracted text, no commentary or formatting changes.",
-      },
-    ]);
+        {
+          text: "Extract ALL text content from this resume PDF exactly as it appears. Include every section, every detail - name, contact info, education, experience, skills, projects, certifications, everything. Return ONLY the extracted text, no commentary or formatting changes.",
+        },
+      ]);
 
-    const text = result.response.text();
-    if (text && text.trim().length > 0) return text;
-    return null;
-  } catch (e) {
-    console.error("[parsePDFGemini] Error:", e.message.substring(0, 150));
-    return null;
+      const text = result.response.text();
+      if (text && text.trim().length > 0) return text;
+      return null;
+    } catch (e) {
+      const is429 = e.message && e.message.includes("429");
+      console.error(`[parsePDFGemini] Attempt ${attempt + 1} error:`, e.message.substring(0, 120));
+      if (!is429 || attempt === retries) return null;
+    }
   }
+  return null;
 }
 
 /**
@@ -585,9 +595,9 @@ function analyzeAchievements(text) {
   };
 }
 
-// ============================================
+
 // MAIN ATS SCORE CALCULATOR
-// ============================================
+
 function calculateATSScore(text) {
   const sections = detectSections(text);
   const { skills, categorized } = extractSkills(text);
