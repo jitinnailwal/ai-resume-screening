@@ -1,12 +1,16 @@
 const fs = require("fs");
 const path = require("path");
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 
-// Pre-load pdf-parse at module level
-let PDFParse;
+// Initialize Gemini
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+// Initialize pdf-parse as fallback
+let PDFParseFallback;
 try {
-  PDFParse = require("pdf-parse").PDFParse;
+  PDFParseFallback = require("pdf-parse").PDFParse;
 } catch (e) {
-  console.error("[resumeParser] Failed to load pdf-parse:", e.message);
+  console.log("[resumeParser] pdf-parse fallback not available");
 }
 
 // SKILLS DATABASE
@@ -182,7 +186,69 @@ const SKILLS_LOOKUP = buildSkillsLookup();
 const SHORT_TERMS = new Set(["r", "go", "js", "ts", "py", "rb", "kt", "sh", "dl", "ml", "cv", "ws", "tf", "ux", "ui", "sql", "css", "asm", "ios"]);
 
 /**
- * Parse PDF file and extract text (pdf-parse v2 API)
+ * Parse PDF file using Gemini API
+ */
+/**
+ * Parse PDF using pdf-parse library (local, no API needed)
+ */
+async function parsePDFLocal(filePath) {
+  if (!PDFParseFallback) return null;
+  try {
+    const fileBuffer = fs.readFileSync(filePath);
+    const uint8Array = new Uint8Array(fileBuffer);
+    const parser = new PDFParseFallback({ data: uint8Array });
+    await parser.load();
+    const result = await parser.getText();
+
+    let text = "";
+    if (result && result.text) {
+      text = result.text;
+    } else if (result && result.pages && result.pages.length > 0) {
+      text = result.pages.map((p) => p.text || "").join("\n");
+    }
+    parser.destroy();
+
+    if (text && text.trim().length > 0) return text;
+    return null;
+  } catch (e) {
+    console.error("[parsePDFLocal] Error:", e.message);
+    return null;
+  }
+}
+
+/**
+ * Parse PDF using Gemini API (better extraction quality)
+ */
+async function parsePDFGemini(filePath) {
+  try {
+    const fileBuffer = fs.readFileSync(filePath);
+    const base64Data = fileBuffer.toString("base64");
+
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+
+    const result = await model.generateContent([
+      {
+        inlineData: {
+          mimeType: "application/pdf",
+          data: base64Data,
+        },
+      },
+      {
+        text: "Extract ALL text content from this resume PDF exactly as it appears. Include every section, every detail - name, contact info, education, experience, skills, projects, certifications, everything. Return ONLY the extracted text, no commentary or formatting changes.",
+      },
+    ]);
+
+    const text = result.response.text();
+    if (text && text.trim().length > 0) return text;
+    return null;
+  } catch (e) {
+    console.error("[parsePDFGemini] Error:", e.message.substring(0, 150));
+    return null;
+  }
+}
+
+/**
+ * Parse PDF file - tries Gemini first, falls back to pdf-parse
  */
 async function parsePDF(filePath) {
   console.log("[parsePDF] Input path:", filePath);
@@ -192,47 +258,24 @@ async function parsePDF(filePath) {
     return null;
   }
 
-  if (!PDFParse) {
-    console.error("[parsePDF] pdf-parse not available");
-    return null;
+  // Try Gemini first
+  console.log("[parsePDF] Trying Gemini API...");
+  const geminiText = await parsePDFGemini(filePath);
+  if (geminiText) {
+    console.log("[parsePDF] Gemini extracted text length:", geminiText.length);
+    return geminiText;
   }
 
-  try {
-    const fileBuffer = fs.readFileSync(filePath);
-    const uint8Array = new Uint8Array(fileBuffer);
-    console.log("[parsePDF] File read, buffer size:", uint8Array.length);
-
-    const parser = new PDFParse({ data: uint8Array });
-    await parser.load();
-    const result = await parser.getText();
-
-    let text = "";
-    if (result && result.text) {
-      // pdf-parse v2 provides result.text directly
-      text = result.text;
-    } else if (result && result.pages && result.pages.length > 0) {
-      text = result.pages.map((p) => p.text || "").join("\n");
-    }
-
-    parser.destroy();
-    console.log("[parsePDF] Extracted text length:", text.length);
-
-    if (text.trim().length > 0) return text;
-    return null;
-  } catch (error) {
-    console.error("[parsePDF] Error:", error.message);
-    console.error("[parsePDF] Stack:", error.stack);
-
-    try {
-      const raw = fs.readFileSync(filePath, "utf-8");
-      const readable = raw.replace(/[^\x20-\x7E\n\r\t]/g, " ").replace(/\s+/g, " ").trim();
-      if (readable.length > 50) {
-        console.log("[parsePDF] Fallback text extraction, length:", readable.length);
-        return readable;
-      }
-    } catch (e) { /* ignore */ }
-    return null;
+  // Fallback to pdf-parse
+  console.log("[parsePDF] Gemini failed, trying pdf-parse...");
+  const localText = await parsePDFLocal(filePath);
+  if (localText) {
+    console.log("[parsePDF] pdf-parse extracted text length:", localText.length);
+    return localText;
   }
+
+  console.error("[parsePDF] All parsing methods failed");
+  return null;
 }
 
 /**
