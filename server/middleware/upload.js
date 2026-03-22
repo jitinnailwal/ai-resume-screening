@@ -1,16 +1,24 @@
 const multer = require("multer");
 const path = require("path");
+const fs = require("fs");
 
-// Avatar upload config
-const avatarStorage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, path.join(__dirname, "../uploads/avatars"));
-  },
-  filename: function (req, file, cb) {
-    const uniqueName = `avatar-${req.user._id}-${Date.now()}${path.extname(file.originalname)}`;
-    cb(null, uniqueName);
-  },
-});
+const isVercel = !!process.env.VERCEL;
+
+// === AVATAR UPLOAD ===
+
+const avatarStorage = isVercel
+  ? multer.memoryStorage()
+  : multer.diskStorage({
+      destination: function (req, file, cb) {
+        const dir = path.join(__dirname, "../uploads/avatars");
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        cb(null, dir);
+      },
+      filename: function (req, file, cb) {
+        const uniqueName = `avatar-${req.user._id}-${Date.now()}${path.extname(file.originalname)}`;
+        cb(null, uniqueName);
+      },
+    });
 
 const avatarFilter = (req, file, cb) => {
   const allowed = /jpeg|jpg|png|webp/;
@@ -29,16 +37,21 @@ const uploadAvatar = multer({
   fileFilter: avatarFilter,
 });
 
-// Resume upload config
-const resumeStorage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, path.join(__dirname, "../uploads/resumes"));
-  },
-  filename: function (req, file, cb) {
-    const uniqueName = `resume-${req.user._id}-${Date.now()}${path.extname(file.originalname)}`;
-    cb(null, uniqueName);
-  },
-});
+// === RESUME UPLOAD ===
+
+const resumeStorage = isVercel
+  ? multer.memoryStorage()
+  : multer.diskStorage({
+      destination: function (req, file, cb) {
+        const dir = path.join(__dirname, "../uploads/resumes");
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        cb(null, dir);
+      },
+      filename: function (req, file, cb) {
+        const uniqueName = `resume-${req.user._id}-${Date.now()}${path.extname(file.originalname)}`;
+        cb(null, uniqueName);
+      },
+    });
 
 const resumeFilter = (req, file, cb) => {
   const allowed = /pdf|doc|docx/;

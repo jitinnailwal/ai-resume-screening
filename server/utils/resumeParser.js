@@ -189,13 +189,12 @@ const SHORT_TERMS = new Set(["r", "go", "js", "ts", "py", "rb", "kt", "sh", "dl"
  * Parse PDF file using Gemini API
  */
 /**
- * Parse PDF using pdf-parse library (local, no API needed)
+ * Parse PDF using pdf-parse library from buffer (local, no API needed)
  */
-async function parsePDFLocal(filePath) {
+async function parsePDFLocal(buffer) {
   if (!PDFParseFallback) return null;
   try {
-    const fileBuffer = fs.readFileSync(filePath);
-    const uint8Array = new Uint8Array(fileBuffer);
+    const uint8Array = new Uint8Array(buffer);
     const parser = new PDFParseFallback({ data: uint8Array });
     await parser.load();
     const result = await parser.getText();
@@ -217,12 +216,11 @@ async function parsePDFLocal(filePath) {
 }
 
 /**
- * Parse PDF using Gemini API (better extraction quality)
+ * Parse PDF using Gemini API from buffer (better extraction quality)
  */
-async function parsePDFGemini(filePath) {
+async function parsePDFGemini(buffer) {
   try {
-    const fileBuffer = fs.readFileSync(filePath);
-    const base64Data = fileBuffer.toString("base64");
+    const base64Data = Buffer.from(buffer).toString("base64");
 
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
@@ -248,19 +246,31 @@ async function parsePDFGemini(filePath) {
 }
 
 /**
- * Parse PDF file - tries Gemini first, falls back to pdf-parse
+ * Parse PDF - accepts a file path (string) OR a Buffer
+ * Tries Gemini first, falls back to pdf-parse
  */
-async function parsePDF(filePath) {
-  console.log("[parsePDF] Input path:", filePath);
+async function parsePDF(input) {
+  let buffer;
 
-  if (!fs.existsSync(filePath)) {
-    console.error("[parsePDF] File does not exist:", filePath);
+  if (Buffer.isBuffer(input)) {
+    buffer = input;
+    console.log("[parsePDF] Received buffer, size:", buffer.length);
+  } else if (typeof input === "string") {
+    console.log("[parsePDF] Input path:", input);
+    if (!fs.existsSync(input)) {
+      console.error("[parsePDF] File does not exist:", input);
+      return null;
+    }
+    buffer = fs.readFileSync(input);
+    console.log("[parsePDF] File read, size:", buffer.length);
+  } else {
+    console.error("[parsePDF] Invalid input type");
     return null;
   }
 
   // Try Gemini first
   console.log("[parsePDF] Trying Gemini API...");
-  const geminiText = await parsePDFGemini(filePath);
+  const geminiText = await parsePDFGemini(buffer);
   if (geminiText) {
     console.log("[parsePDF] Gemini extracted text length:", geminiText.length);
     return geminiText;
@@ -268,7 +278,7 @@ async function parsePDF(filePath) {
 
   // Fallback to pdf-parse
   console.log("[parsePDF] Gemini failed, trying pdf-parse...");
-  const localText = await parsePDFLocal(filePath);
+  const localText = await parsePDFLocal(buffer);
   if (localText) {
     console.log("[parsePDF] pdf-parse extracted text length:", localText.length);
     return localText;

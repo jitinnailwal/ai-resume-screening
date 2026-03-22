@@ -4,17 +4,18 @@ const fs = require("fs");
 const path = require("path");
 const { parsePDF, extractSkills, calculateATSScore, matchResumeToJob } = require("../utils/resumeParser");
 
-// Helper: get absolute path to a resume file
+const isVercel = !!process.env.VERCEL;
+
+// Helper: get absolute path to a resume file (local only)
 function getResumePath(filename) {
   return path.resolve(path.join(__dirname, "..", "uploads", "resumes", filename));
 }
 
-// Helper: analyze a resume file and return full ATS analysis
-async function analyzeResume(filePath) {
-  console.log("[ANALYZE] Parsing file:", filePath);
-  console.log("[ANALYZE] File exists:", fs.existsSync(filePath));
+// Helper: analyze a resume from buffer or file path
+async function analyzeResume(input) {
+  console.log("[ANALYZE] Parsing, input type:", Buffer.isBuffer(input) ? "buffer" : "filepath");
 
-  const parsedText = await parsePDF(filePath);
+  const parsedText = await parsePDF(input);
   console.log("[ANALYZE] Parsed text length:", parsedText ? parsedText.length : 0);
 
   if (!parsedText || parsedText.trim().length === 0) {
@@ -43,21 +44,30 @@ exports.uploadResume = async (req, res) => {
       return res.status(400).json({ message: "Please upload a resume file (PDF or DOC)" });
     }
 
-    console.log("[UPLOAD] File received:", req.file.originalname, "->", req.file.filename);
+    console.log("[UPLOAD] File received:", req.file.originalname);
+
+    // On Vercel: req.file.buffer exists (memory storage)
+    // Locally: req.file.filename exists (disk storage)
+    const filePath = isVercel
+      ? `memory-${req.user._id}-${Date.now()}.pdf`
+      : req.file.filename;
 
     // Create resume record
     const resume = await Resume.create({
       user: req.user._id,
       fileName: req.file.originalname,
-      filePath: req.file.filename,
+      filePath: filePath,
     });
 
     // Parse PDF
     if (req.file.originalname.toLowerCase().endsWith(".pdf")) {
-      const fullPath = getResumePath(req.file.filename);
-
       try {
-        const result = await analyzeResume(fullPath);
+        // Use buffer on Vercel, file path locally
+        const input = isVercel
+          ? req.file.buffer
+          : getResumePath(req.file.filename);
+
+        const result = await analyzeResume(input);
         if (result) {
           resume.parsedText = result.parsedText;
           resume.skills = result.skills;
@@ -73,7 +83,6 @@ exports.uploadResume = async (req, res) => {
         console.log("[UPLOAD] Saved resume with score:", resume.score, "status:", resume.status);
       } catch (parseErr) {
         console.error("[UPLOAD] Parse error:", parseErr.message);
-        console.error("[UPLOAD] Stack:", parseErr.stack);
         resume.status = "parsed";
         await resume.save();
       }
@@ -102,10 +111,29 @@ exports.reanalyzeResume = async (req, res) => {
       return res.status(400).json({ message: "Only PDF files can be analyzed" });
     }
 
-    const fullPath = getResumePath(resume.filePath);
-    console.log("[REANALYZE] File:", fullPath, "exists:", fs.existsSync(fullPath));
+    // On Vercel, re-analyze using stored parsedText (no file on disk)
+    // Locally, re-parse from file
+    let result;
+    if (isVercel) {
+      if (resume.parsedText && resume.parsedText.trim().length > 0) {
+        const atsResult = calculateATSScore(resume.parsedText);
+        result = {
+          parsedText: resume.parsedText,
+          skills: atsResult.skills,
+          categorizedSkills: atsResult.categorized,
+          score: atsResult.score,
+          scoreBreakdown: atsResult.breakdown,
+          analysisMetadata: atsResult.metadata,
+        };
+      } else {
+        return res.status(400).json({ message: "No parsed text available to re-analyze" });
+      }
+    } else {
+      const fullPath = getResumePath(resume.filePath);
+      console.log("[REANALYZE] File:", fullPath, "exists:", fs.existsSync(fullPath));
+      result = await analyzeResume(fullPath);
+    }
 
-    const result = await analyzeResume(fullPath);
     if (result) {
       resume.parsedText = result.parsedText;
       resume.skills = result.skills;
@@ -136,11 +164,27 @@ exports.reanalyzeAll = async (req, res) => {
 
     for (const resume of resumes) {
       if (!resume.fileName.toLowerCase().endsWith(".pdf")) continue;
-      const fullPath = getResumePath(resume.filePath);
-      if (!fs.existsSync(fullPath)) continue;
 
       try {
-        const result = await analyzeResume(fullPath);
+        let result;
+        if (isVercel) {
+          if (resume.parsedText && resume.parsedText.trim().length > 0) {
+            const atsResult = calculateATSScore(resume.parsedText);
+            result = {
+              parsedText: resume.parsedText,
+              skills: atsResult.skills,
+              categorizedSkills: atsResult.categorized,
+              score: atsResult.score,
+              scoreBreakdown: atsResult.breakdown,
+              analysisMetadata: atsResult.metadata,
+            };
+          }
+        } else {
+          const fullPath = getResumePath(resume.filePath);
+          if (!fs.existsSync(fullPath)) continue;
+          result = await analyzeResume(fullPath);
+        }
+
         if (result) {
           resume.parsedText = result.parsedText;
           resume.skills = result.skills;
@@ -199,10 +243,12 @@ exports.deleteResume = async (req, res) => {
       return res.status(404).json({ message: "Resume not found" });
     }
 
-    // Delete file from disk
-    const filePath = getResumePath(resume.filePath);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
+    // Delete file from disk (local only)
+    if (!isVercel) {
+      const filePath = getResumePath(resume.filePath);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
     }
 
     await Resume.deleteOne({ _id: resume._id });
